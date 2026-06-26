@@ -523,6 +523,26 @@ section.page-section{padding:90px 24px}
 }
 .intro-text p:first-of-type{font-size:24px;font-style:italic;color:var(--copper-glow)}
 .intro-text strong{color:var(--copper-glow);font-weight:600;font-style:normal}
+.contrib-block{margin-top:56px;text-align:center}
+.contrib-list{
+  list-style:none;counter-reset:contrib-counter;
+  max-width:420px;margin:24px auto 0;padding:0;
+  text-align:left;
+}
+.contrib-list li{
+  counter-increment:contrib-counter;
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;font-weight:300;line-height:1.5;
+  color:var(--paper,#f5efe0);
+  display:flex;align-items:baseline;gap:14px;
+  padding:10px 0;border-bottom:1px solid rgba(245,239,224,.12);
+}
+.contrib-list li::before{
+  content:counter(contrib-counter);
+  font-family:'Cinzel',serif;font-size:14px;color:var(--copper-glow);
+  border:1px solid var(--copper-glow);border-radius:50%;
+  width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;
+}
 
 /* ===============================================================
    COUPLE NAMES — ornamental divider section
@@ -1650,7 +1670,7 @@ body.splash-on{overflow:hidden;height:100vh}
       <h1>Maeva<span class="amp">&amp;</span>Felix</h1>
       <p class="hero-tagline">« Avant les vœux, l'union sacrée de nos familles. »</p>
       <div class="hero-date">
-        <span>01</span><span class="dot"></span><span>08</span><span class="dot"></span><span>2026</span>
+        <span>30</span><span class="dot"></span><span>07</span><span class="dot"></span><span>2026</span>
       </div>
     </div>
     <div class="hero-scroll">
@@ -1768,8 +1788,18 @@ body.splash-on{overflow:hidden;height:100vh}
       <div class="intro-grid reveal">
         <div class="intro-text">
           <p>Vous êtes cordialement invités à partager avec nous ce moment sacré de la tradition ivoirienne, où nos deux familles se rencontrent officiellement pour sceller notre union dans le respect des coutumes ancestrales.</p>
-          <p>Votre présence honorera nos familles. Si vous souhaitez contribuer financièrement, cela se fera <strong>uniquement par Virement Bancaire, Wave ou Orange Money</strong>.</p>
         </div>
+      </div>
+      <div class="contrib-block reveal">
+        <h2 class="section-h2">Contribution</h2>
+        <div class="intro-text">
+          <p>Votre présence sera notre plus beau cadeau. Toutefois, si vous souhaitez nous faire un don pour nous accompagner dans cette magnifique aventure, cela se fera uniquement par :</p>
+        </div>
+        <ol class="contrib-list">
+          <li>Wave</li>
+          <li>Orange Money</li>
+          <li>Virement bancaire</li>
+        </ol>
       </div>
     </div>
   </section>
@@ -1797,26 +1827,6 @@ body.splash-on{overflow:hidden;height:100vh}
     </div>
   </section>
 
-  <!-- BAR -->
-  <section class="bar page-section">
-    <div class="container">
-      <div class="section-title reveal">
-        <div class="section-eyebrow">À votre santé</div>
-        <h2 class="section-h2">Bar à <em>rafraîchissements</em></h2>
-      </div>
-      <div class="bar-pills reveal">
-        <span class="bar-pill">Cocktail</span>
-        <span class="bar-pill">Mocktail</span>
-        <span class="bar-pill">Vin</span>
-        <span class="bar-pill">Champagne</span>
-        <span class="bar-pill">Liqueur</span>
-        <span class="bar-pill">Eau</span>
-        <span class="bar-pill">Jus de fruit</span>
-        <span class="bar-pill">Soda</span>
-      </div>
-    </div>
-  </section>
-
   <!-- LIEU -->
   <section class="lieu page-section" id="lieu">
     <div class="container">
@@ -1838,6 +1848,26 @@ body.splash-on{overflow:hidden;height:100vh}
             Ouvrir l'itinéraire
           </a>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BAR -->
+  <section class="bar page-section">
+    <div class="container">
+      <div class="section-title reveal">
+        <div class="section-eyebrow">À votre santé</div>
+        <h2 class="section-h2">Bar à <em>rafraîchissements</em></h2>
+      </div>
+      <div class="bar-pills reveal">
+        <span class="bar-pill">Cocktail</span>
+        <span class="bar-pill">Mocktail</span>
+        <span class="bar-pill">Vin</span>
+        <span class="bar-pill">Champagne</span>
+        <span class="bar-pill">Liqueur</span>
+        <span class="bar-pill">Eau</span>
+        <span class="bar-pill">Jus de fruit</span>
+        <span class="bar-pill">Soda</span>
       </div>
     </div>
   </section>
@@ -2223,6 +2253,7 @@ let mediaStream = null;
 let capturedBlob = null;
 
 async function startCamera(){
+  $('rsvp-feedback').innerHTML = '';
   try{
     mediaStream = await navigator.mediaDevices.getUserMedia({
       video:{facingMode:'user',width:{ideal:1280},height:{ideal:1280}},
@@ -2235,7 +2266,7 @@ async function startCamera(){
     hide('btn-start-cam');
     show('btn-capture');
   } catch(e){
-    $('rsvp-feedback').innerHTML = '<div class="error">Impossible d\'accéder à la caméra. Vérifiez les permissions.</div>';
+    console.warn('[CAMERA] accès refusé ou indisponible', e);
   }
 }
 
@@ -2620,7 +2651,7 @@ async function downloadPDF(){
     doc.setFont('times','italic');
     doc.setFontSize(5.2);
     doc.setTextColor(...GOLD_DEEP);
-    const giftMsg = "Votre présence sera notre plus beau cadeau. Si vous souhaitez tout de même contribuer financièrement, cela se fera uniquement par Virement Bancaire, Wave ou Orange Money.";
+    const giftMsg = "Votre présence sera notre plus beau cadeau. Toutefois, si vous souhaitez nous faire un don pour nous accompagner dans cette magnifique aventure, cela se fera uniquement par : 1) Wave  2) Orange Money  3) Virement bancaire.";
     const giftLines = doc.splitTextToSize(giftMsg, 80);
     giftLines.forEach((line, i) => {
       doc.text(line, RCX, giftY + i*2.4, {align:'center'});
