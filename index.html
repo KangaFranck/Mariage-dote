@@ -1261,6 +1261,40 @@ footer{
 }
 .guests-table tr:hover td{background:rgba(255,255,255,.02)}
 
+.search-bar{display:flex}
+.search-bar input{
+  flex:1;min-width:240px;
+  padding:14px 18px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:60px;
+  color:var(--paper);
+  font-size:14px;
+}
+.search-bar input:focus{outline:none;border-color:var(--gold)}
+.search-bar input::placeholder{color:rgba(255,255,255,.4)}
+
+.table-group-card{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(244,199,106,.18);
+  border-radius:var(--radius);
+  padding:20px 24px;margin-bottom:16px;
+}
+.table-group-title{
+  font-family:'Cinzel',serif;font-size:12px;letter-spacing:.18em;
+  color:var(--gold-light);margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;
+}
+.table-group-count{
+  background:rgba(244,199,106,.18);color:var(--gold-light);
+  border-radius:20px;padding:2px 10px;font-size:11px;
+}
+.table-group-list{list-style:none;display:flex;flex-wrap:wrap;gap:8px 16px}
+.table-group-list li{
+  font-size:14px;color:rgba(255,255,255,.9);
+  padding:4px 0;
+}
+
 .badge{
   display:inline-block;padding:4px 12px;border-radius:20px;
   font-family:'Cinzel',serif;font-size:9px;letter-spacing:.2em;
@@ -1948,6 +1982,7 @@ body.splash-on{overflow:hidden;height:100vh}
 
     <div class="org-tabs">
       <button class="org-tab active" onclick="showTab('invites', this)">Invités</button>
+      <button class="org-tab" onclick="showTab('tables', this)">Tables</button>
       <button class="org-tab" onclick="showTab('scanner', this)">Scanner QR</button>
       <button class="org-tab" onclick="showTab('mouvements', this)">Mouvements</button>
       <button class="org-tab" onclick="showTab('parametres', this)">Paramètres</button>
@@ -1957,17 +1992,29 @@ body.splash-on{overflow:hidden;height:100vh}
       <h3>Liste des invités</h3>
       <div class="add-guest-form">
         <input id="new-guest-name" type="text" placeholder="Nom complet de l'invité">
+        <input id="new-guest-table" type="text" placeholder="Table (ex: Table 5)">
         <button class="btn-primary" onclick="addGuest()">+ Ajouter &amp; générer lien</button>
       </div>
       <div id="new-link-result" class="hidden"></div>
-      <div style="overflow-x:auto;margin-top:24px">
+      <div class="search-bar" style="margin-top:24px">
+        <input id="guests-search" type="text" placeholder="Rechercher par nom ou par table…" oninput="filterGuests()">
+      </div>
+      <div style="overflow-x:auto;margin-top:16px">
         <table class="guests-table">
           <thead><tr>
-            <th>Nom</th><th>Code</th><th>Statut</th><th>Présence</th><th>Actions</th>
+            <th>Nom</th><th>Table</th><th>Code</th><th>Statut</th><th>Présence</th><th>Actions</th>
           </tr></thead>
           <tbody id="guests-tbody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div id="tab-tables" class="org-panel hidden">
+      <h3>Invités par table</h3>
+      <div class="search-bar">
+        <input id="tables-search" type="text" placeholder="Rechercher une table (ex: Table 5)…" oninput="renderTablesView()">
+      </div>
+      <div id="tables-grouped" style="margin-top:20px"></div>
     </div>
 
     <div id="tab-scanner" class="org-panel hidden">
@@ -3137,11 +3184,12 @@ const SCAN_COOLDOWN_MS = 60000; // 60 secondes entre deux scans réussis
 function showTab(tab, btn){
   document.querySelectorAll('.org-tab').forEach(t=>t.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['invites','scanner','mouvements','parametres'].forEach(t=>hide('tab-'+t));
+  ['invites','tables','scanner','mouvements','parametres'].forEach(t=>hide('tab-'+t));
   show('tab-'+tab);
   if(tab==='scanner') initScanner();
   else stopScanner();
   if(tab==='mouvements') loadMouvements();
+  if(tab==='tables') renderTablesView();
   if(tab==='parametres'){
     // Reset form fields when entering settings
     ['cp-old','cp-new','cp-confirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
@@ -3149,16 +3197,22 @@ function showTab(tab, btn){
   }
 }
 
+let allInvites = [];
+
 async function loadDashboard(){
   const invites = await sbSelect('dote_invites','select=*&order=created_at.desc');
+  allInvites = invites;
   $('st-total').textContent = invites.length;
   $('st-confirmed').textContent = invites.filter(i=>i.statut==='confirme').length;
   $('st-pending').textContent = invites.filter(i=>i.statut==='en_attente').length;
   $('st-entered').textContent = invites.filter(i=>i.presence==='entre').length;
+  renderGuestsTable(invites);
+}
 
+function renderGuestsTable(invites){
   const tbody = $('guests-tbody');
   if(invites.length===0){
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.5);font-style:italic;padding:30px">Aucun invité pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.5);font-style:italic;padding:30px">Aucun invité pour le moment.</td></tr>';
     return;
   }
   tbody.innerHTML = invites.map(i=>{
@@ -3172,6 +3226,7 @@ async function loadDashboard(){
     return `
       <tr>
         <td><strong>${escapeHtml(i.nom||'')}</strong></td>
+        <td>${escapeHtml(i.table_nom||'—')}</td>
         <td><code style="font-size:12px;color:var(--gold-light)">${escapeHtml(i.code||'—')}</code></td>
         <td>${statutBadge}</td>
         <td>${presBadge}</td>
@@ -3185,8 +3240,54 @@ async function loadDashboard(){
   }).join('');
 }
 
+function filterGuests(){
+  const q = ($('guests-search').value || '').trim().toLowerCase();
+  if(!q){ renderGuestsTable(allInvites); return; }
+  const filtered = allInvites.filter(i=>
+    (i.nom||'').toLowerCase().includes(q) ||
+    (i.table_nom||'').toLowerCase().includes(q)
+  );
+  renderGuestsTable(filtered);
+}
+
+function renderTablesView(){
+  const wrap = $('tables-grouped');
+  if(!wrap) return;
+  const q = ($('tables-search')?.value || '').trim().toLowerCase();
+
+  // Regroupement insensible à la casse (clé normalisée en minuscules)
+  const groups = {};
+  allInvites.forEach(i=>{
+    const label = (i.table_nom||'').trim();
+    const key = label ? label.toLowerCase() : '__sans_table__';
+    if(!groups[key]) groups[key] = { label: label || 'Sans table assignée', guests: [] };
+    groups[key].guests.push(i);
+  });
+
+  let entries = Object.values(groups);
+  if(q){
+    entries = entries.filter(g => g.label.toLowerCase().includes(q));
+  }
+  entries.sort((a,b)=> a.label.localeCompare(b.label, 'fr', {numeric:true}));
+
+  if(entries.length===0){
+    wrap.innerHTML = '<p style="text-align:center;color:rgba(255,255,255,.5);font-style:italic;padding:30px">Aucune table trouvée.</p>';
+    return;
+  }
+
+  wrap.innerHTML = entries.map(g => `
+    <div class="table-group-card">
+      <div class="table-group-title">${escapeHtml(g.label)} <span class="table-group-count">${g.guests.length}</span></div>
+      <ul class="table-group-list">
+        ${g.guests.map(gu => `<li>${escapeHtml(gu.nom||'')}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+}
+
 async function addGuest(){
   const name = $('new-guest-name').value.trim();
+  const tableNom = ($('new-guest-table')?.value || '').trim();
   if(!name){ toast('Saisir un nom'); return; }
   const id = generateId();
   // Auto-retry en cas de collision (extrêmement rare mais blindage 500+ invités)
@@ -3200,6 +3301,7 @@ async function addGuest(){
         headers:{...SB_HEADERS,'Prefer':'return=minimal'},
         body:JSON.stringify({
           id, code, nom:name,
+          table_nom: tableNom || null,
           statut:'en_attente',
           scanned:false,
           created_at:new Date().toISOString()
@@ -3236,6 +3338,7 @@ async function addGuest(){
       </div>
     `;
     $('new-guest-name').value = '';
+    $('new-guest-table').value = '';
     toast('Invité ajouté avec succès');
     loadDashboard();
   } catch(e){
