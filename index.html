@@ -2325,11 +2325,6 @@ setTimeout(function(){
       splash.remove();
       return;
     }
-    // Show only once per session
-    if(safeSessionGet('splash_shown') === '1'){
-      splash.remove();
-      return;
-    }
     document.body.classList.add('splash-on');
     // Auto-dismiss after ~4.6s (after all animations complete)
     setTimeout(dismissSplash, 4600);
@@ -2343,7 +2338,6 @@ function dismissSplash(){
   const splash = document.getElementById('splash');
   if(!splash) return;
   splash.classList.add('gone');
-  safeSessionSet('splash_shown','1');
   setTimeout(()=>{
     splash.remove();
     document.body.classList.remove('splash-on');
@@ -3438,8 +3432,8 @@ function renderGuestsTable(invites){
         <td>${presBadge}</td>
         <td>
           ${i.code?`<button class="action-btn" onclick="copyLink('${i.code}')">📋 Lien</button>`:''}
-          ${i.code?`<button class="action-btn" onclick="shareWhatsApp('${i.code}','${escapeHtml(i.nom||'')}','${escapeHtml(i.telephone||'')}')">📱 WhatsApp</button>`:''}
-          <button class="action-btn danger" onclick="deleteGuest('${i.id}','${escapeHtml(i.nom||'')}')">Supprimer</button>
+          ${i.code?`<button class="action-btn" data-code="${i.code}" data-nom="${escapeHtml(i.nom||'')}" data-tel="${escapeHtml(i.telephone||'')}" onclick="shareWhatsApp(this)">📱 WhatsApp</button>`:''}
+          <button class="action-btn danger" data-id="${i.id}" data-nom="${escapeHtml(i.nom||'')}" onclick="deleteGuest(this)">Supprimer</button>
         </td>
       </tr>
     `;
@@ -3676,7 +3670,7 @@ async function addGuest(){
         <div class="link-box">${link}</div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="action-btn" onclick="copyLink('${code}')">📋 Copier le lien</button>
-          <button class="action-btn" onclick="shareWhatsApp('${code}','${escapeHtml(name)}','${escapeHtml(phone)}')">📱 WhatsApp</button>
+          <button class="action-btn" data-code="${code}" data-nom="${escapeHtml(name)}" data-tel="${escapeHtml(phone)}" onclick="shareWhatsApp(this)">📱 WhatsApp</button>
         </div>
       </div>
     `;
@@ -3714,7 +3708,18 @@ function updatePhoneHint(){
 }
 updatePhoneHint();
 
-function shareWhatsApp(code, name, phone){
+function shareWhatsApp(btnOrCode, maybeName, maybePhone){
+  // Accepte soit l'élément bouton (data-code/data-nom/data-tel), soit les
+  // arguments bruts (compat rétro). Passer par des data-attributes évite de
+  // casser le onclick inline quand le nom contient une apostrophe (ex: N'Guessan).
+  let code, name, phone;
+  if(btnOrCode instanceof HTMLElement){
+    code = btnOrCode.dataset.code;
+    name = btnOrCode.dataset.nom || '';
+    phone = btnOrCode.dataset.tel || '';
+  } else {
+    code = btnOrCode; name = maybeName || ''; phone = maybePhone || '';
+  }
   const link = `${window.location.origin}${window.location.pathname}?invite=${code}`;
   const msg = `Bonjour ${name},\n\nVous êtes cordialement invité(e) à la cérémonie de la dote de Maeva & Felix le jeudi 30 juillet 2026 au Pavillon Lotus (Abidjan).\n\nVoici votre invitation personnelle :\n${link}\n\nMerci de confirmer votre présence. 🌺`;
   const digits = (phone || '').replace(/[^0-9]/g, '');
@@ -3722,11 +3727,31 @@ function shareWhatsApp(code, name, phone){
   window.open(url,'_blank');
 }
 
-async function deleteGuest(id, name){
+async function deleteGuest(btnOrId, maybeName){
+  // Idem : accepte l'élément bouton (data-id/data-nom) pour éviter de casser
+  // le onclick inline avec des noms contenant une apostrophe.
+  let id, name;
+  if(btnOrId instanceof HTMLElement){
+    id = btnOrId.dataset.id;
+    name = btnOrId.dataset.nom || '';
+  } else {
+    id = btnOrId; name = maybeName || '';
+  }
   if(!confirm(`Supprimer définitivement ${name} ?`)) return;
-  await sbDelete('dote_invites', `id=eq.${id}`);
-  toast('Invité supprimé');
-  loadDashboard();
+  try{
+    const res = await sbDelete('dote_invites', `id=eq.${id}`);
+    if(!res.ok){
+      const errTxt = await res.text().catch(()=>'');
+      console.error('[DELETE] échec', res.status, errTxt);
+      toast('Erreur lors de la suppression : '+res.status);
+      return;
+    }
+    toast('Invité supprimé');
+    loadDashboard();
+  } catch(e){
+    console.error('[DELETE] erreur réseau', e);
+    toast('Erreur réseau lors de la suppression');
+  }
 }
 
 /* ============== QR SCANNER ============== */
