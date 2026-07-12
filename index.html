@@ -543,9 +543,16 @@ section.page-section{padding:90px 24px}
   background:var(--copper-glow);
   flex:none;
 }
+.contrib-detail{
+  font-family:'Cinzel',serif;
+  font-size:12px;font-weight:400;letter-spacing:.03em;
+  color:var(--gold-light,var(--copper-glow));
+  line-height:1.7;
+}
 @media (max-width:480px){
   .contrib-list{gap:18px 8px}
   .contrib-list li{font-size:17px}
+  .contrib-detail{font-size:11px}
 }
 
 /* ===============================================================
@@ -2063,9 +2070,9 @@ body.splash-on{overflow:hidden;height:100vh}
           <p>Votre présence sera notre plus beau cadeau. Toutefois, si vous souhaitez nous faire un don pour nous accompagner dans cette magnifique aventure, cela se fera uniquement par :</p>
         </div>
         <ol class="contrib-list">
-          <li>Wave</li>
-          <li>Orange Money</li>
-          <li>Virement bancaire</li>
+          <li>Wave<span class="contrib-detail">+225 07 07 95 00 95<br>+225 07 47 90 47 90</span></li>
+          <li>Orange Money<span class="contrib-detail">+225 07 07 95 00 95<br>+225 07 08 78 78 91</span></li>
+          <li>Virement bancaire<span class="contrib-detail">Code banque CI006 · Guichet 01753<br>Compte 011014260005 · Clé 41</span></li>
         </ol>
       </div>
     </div>
@@ -3180,10 +3187,20 @@ async function downloadPDF(){
     doc.setFont('times','italic');
     doc.setFontSize(5.2);
     doc.setTextColor(...GOLD_DEEP);
-    const giftMsg = "Votre présence sera notre plus beau cadeau. Toutefois, si vous souhaitez nous faire un don pour nous accompagner dans cette magnifique aventure, cela se fera uniquement par : 1) Wave  2) Orange Money  3) Virement bancaire.";
+    const giftMsg = "Votre présence sera notre plus beau cadeau. Pour un don, voici nos coordonnées :";
     const giftLines = doc.splitTextToSize(giftMsg, 80);
     giftLines.forEach((line, i) => {
-      doc.text(line, RCX, giftY + i*2.4, {align:'center'});
+      doc.text(line, RCX, giftY + i*2.3, {align:'center'});
+    });
+    // Coordonnées de don (Wave / OM / RIB) — ligne compacte
+    const payY = giftY + giftLines.length*2.3 + 0.8;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(4.3);
+    doc.setTextColor(...NAVY_DEEP);
+    const payMsg = "Wave/OM : 07 07 95 00 95  ·  RIB : CI006 01753 011014260005 41";
+    const payLines = doc.splitTextToSize(payMsg, 84);
+    payLines.forEach((line, i) => {
+      doc.text(line, RCX, payY + i*2.0, {align:'center'});
     });
 
     doc.save(`Invitation_${currentInvite.nom.replace(/\s+/g,'_')}.pdf`);
