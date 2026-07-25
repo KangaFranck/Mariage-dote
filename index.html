@@ -2225,6 +2225,7 @@ body.splash-on{overflow:hidden;height:100vh}
       <div class="stat-card" id="stat-card-notifie_sms" onclick="filterByStat('notifie_sms')"><div class="stat-num" id="st-sms">0</div><div class="stat-label">Invités SMS</div></div>
       <div class="stat-card" id="stat-card-decline" onclick="filterByStat('decline')"><div class="stat-num" id="st-declined">0</div><div class="stat-label">Déclinés</div></div>
       <div class="stat-card" id="stat-card-non_notifie" onclick="filterByStat('non_notifie')" style="border-color:rgba(224,122,95,.45)"><div class="stat-num" id="st-non-notifie" style="color:#E07A5F">0</div><div class="stat-label">Non notifiés</div></div>
+      <div class="stat-card" id="stat-card-a_relancer" onclick="filterByStat('a_relancer')" style="border-color:rgba(244,199,106,.45)" title="Notifiés (SMS/WhatsApp) mais toujours en attente : le clic ne prouve pas la réception, à recontacter par appel pour vérifier"><div class="stat-num" id="st-a-relancer" style="color:var(--gold)">0</div><div class="stat-label">Notifiés sans réponse — à vérifier</div></div>
     </div>
 
     <div class="org-tabs">
@@ -2606,14 +2607,9 @@ async function loadInvite(code){
     }
     currentInvite = data[0];
     if(currentInvite.statut === 'confirme'){
-      // La reconfirmation ne doit être demandée qu'après l'envoi effectif du
-      // message de relance (onglet Notifications) — pas dès que l'invité
-      // rouvre son ancien lien avant que l'organisateur n'ait lancé cette phase.
-      if(currentInvite.relance_envoyee && !currentInvite.reconfirme){
-        showReconfirmGate();
-      } else {
-        showConfirmedView();
-      }
+      // Mode reconfirmation désactivé : une confirmation suffit, on ne
+      // redemande jamais rien à l'invité une fois confirmé.
+      showConfirmedView();
     } else if(currentInvite.statut === 'decline'){
       showDeclinedView();
     } else {
@@ -3536,6 +3532,7 @@ async function loadDashboard(){
   $('st-sms').textContent = invites.filter(i=>i.notifie_sms).length;
   $('st-declined').textContent = invites.filter(i=>i.statut==='decline').length;
   $('st-non-notifie').textContent = invites.filter(isNonNotifie).length;
+  $('st-a-relancer').textContent = invites.filter(isToRelance).length;
   filterGuests();
 }
 
@@ -3594,6 +3591,7 @@ function filterGuests(){
   else if(quickFilter === 'notifie_sms') list = list.filter(i=>i.notifie_sms);
   else if(quickFilter === 'decline') list = list.filter(i=>i.statut==='decline');
   else if(quickFilter === 'non_notifie') list = list.filter(isNonNotifie);
+  else if(quickFilter === 'a_relancer') list = list.filter(isToRelance);
   if(q){
     list = list.filter(i=>
       (i.nom||'').toLowerCase().includes(q) ||
@@ -3603,7 +3601,7 @@ function filterGuests(){
   renderGuestsTable(list);
 }
 
-const QUICK_FILTER_LABELS = { confirme:'Confirmés', en_attente:'En attente', entre:'Présents', reconfirme:'Reconfirmés', notifie_whatsapp:'Invités WhatsApp', notifie_sms:'Invités SMS', decline:'Déclinés', non_notifie:'Non notifiés (numéro manquant/invalide ou jamais notifié)' };
+const QUICK_FILTER_LABELS = { confirme:'Confirmés', en_attente:'En attente', entre:'Présents', reconfirme:'Reconfirmés', notifie_whatsapp:'Invités WhatsApp', notifie_sms:'Invités SMS', decline:'Déclinés', non_notifie:'Non notifiés (numéro manquant/invalide ou jamais notifié)', a_relancer:'Notifiés (SMS/WhatsApp envoyé) mais toujours en attente — réception non garantie, à vérifier par appel' };
 
 function filterByStat(type){
   quickFilter = type;
@@ -3693,6 +3691,17 @@ function isNonNotifie(i){
   if(!phone || !phone.trim()) return true;
   if(!isPhoneValid(phone)) return true;
   return !(i.notifie_sms || i.notifie_whatsapp);
+}
+
+// Un clic sur "Envoyé" ne prouve pas que le SMS/WhatsApp est vraiment arrivé
+// (ni SMS ni le lien wa.me ne renvoient d'accusé de réception au site). Cette
+// liste regroupe les invités à numéro valide, marqués notifiés, mais toujours
+// en attente : à recontacter par appel pour vérifier qu'ils ont bien reçu
+// l'invitation avant de considérer leur silence comme un non-intérêt.
+function isToRelance(i){
+  if(i.statut !== 'en_attente') return false;
+  if(!isPhoneValid(i.telephone)) return false;
+  return !!(i.notifie_sms || i.notifie_whatsapp);
 }
 
 function renderNotifList(){
