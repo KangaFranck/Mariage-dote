@@ -4313,10 +4313,13 @@ async function onScanSuccess(decodedText){
     action: newPresence==='entre'?'entree':'sortie',
     created_at:new Date().toISOString()
   });
+  const tableDisplay = (guest.table_nom || '').trim() || 'null';
   $('scan-result').innerHTML = `
     <div class="scan-result success">
       <h4>${newPresence==='entre'?'✓ ENTRÉE':'↩ SORTIE'}</h4>
       <p><strong>${escapeHtml(guest.nom)}</strong></p>
+      <p style="font-size:14px;margin-top:4px;opacity:.85">${escapeHtml(guest.telephone || 'Aucun numéro')}</p>
+      <p style="font-size:14px;margin-top:4px;opacity:.85">Table : ${escapeHtml(tableDisplay)}</p>
       <p style="font-size:13px;margin-top:6px;opacity:.7">${new Date().toLocaleTimeString('fr-FR')}</p>
     </div>
     <div class="scan-cooldown" id="scan-cooldown">
