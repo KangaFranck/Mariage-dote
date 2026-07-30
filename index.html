@@ -3963,7 +3963,7 @@ function renderNotifTableView(){
           ${g.guests.map(gu => `<li>${escapeHtml(gu.nom||'')}${!isIvorian(gu.telephone) ? ' <span style="color:var(--gold)">(hors CI)</span>' : ''}</li>`).join('')}
         </ul>
         <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
-          <button class="action-btn" ${ivoiriens.length===0?'disabled':''} onclick="sendGroupSmsForTable('${labelSafe.replace(/'/g,"\\'")}')">✉️ SMS groupé — ${ivoiriens.length} ivoirien(s)</button>
+          <button class="action-btn" data-table="${labelSafe}" ${ivoiriens.length===0?'disabled':''} onclick="sendGroupSmsForTable(this.dataset.table)">✉️ SMS groupé — ${ivoiriens.length} ivoirien(s)</button>
         </div>
         ${autres.length>0 ? `
           <div style="margin-top:14px">
