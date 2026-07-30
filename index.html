@@ -4314,8 +4314,10 @@ async function onScanSuccess(decodedText){
     created_at:new Date().toISOString()
   });
   const tableDisplay = (guest.table_nom || '').trim() || 'null';
+  const photoUrl = guest.selfie_url || 'https://psihlbyysylmttihldcs.supabase.co/storage/v1/object/public/dote-photos-invites/selfie_PLACEHOLDER_MANUEL_1784583823411.jpg';
   $('scan-result').innerHTML = `
     <div class="scan-result success">
+      <img src="${photoUrl}" alt="${escapeHtml(guest.nom)}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid var(--mint);display:block;margin:0 auto 12px">
       <h4>${newPresence==='entre'?'✓ ENTRÉE':'↩ SORTIE'}</h4>
       <p><strong>${escapeHtml(guest.nom)}</strong></p>
       <p style="font-size:14px;margin-top:4px;opacity:.85">${escapeHtml(guest.telephone || 'Aucun numéro')}</p>
