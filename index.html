@@ -2227,6 +2227,7 @@ body.splash-on{overflow:hidden;height:100vh}
       <div class="stat-card" id="stat-card-non_notifie" onclick="filterByStat('non_notifie')" style="border-color:rgba(224,122,95,.45)"><div class="stat-num" id="st-non-notifie" style="color:#E07A5F">0</div><div class="stat-label">Non notifiés</div></div>
       <div class="stat-card" id="stat-card-a_relancer" onclick="filterByStat('a_relancer')" style="border-color:rgba(244,199,106,.45)" title="Notifiés (SMS/WhatsApp) mais toujours en attente : le clic ne prouve pas la réception, à recontacter par appel pour vérifier"><div class="stat-num" id="st-a-relancer" style="color:var(--gold)">0</div><div class="stat-label">Notifiés sans réponse — à vérifier</div></div>
       <div class="stat-card" id="stat-card-notiftable" onclick="showTab('notiftable', null)" title="Notifier les invités confirmés, groupés par table"><div class="stat-num" id="st-notiftable-tables">0</div><div class="stat-label">Notifier Table</div></div>
+      <div class="stat-card" id="stat-card-remerciement" onclick="showTab('remerciement', null)" title="Envoyer un message de remerciement aux invités confirmés"><div class="stat-num" id="st-remerciement-count">0</div><div class="stat-label">Remerciements</div></div>
     </div>
 
     <div class="org-tabs">
@@ -2381,6 +2382,35 @@ Votre table : {table}
         <input id="notiftable-search" type="text" placeholder="Rechercher une table…" oninput="renderNotifTableView()">
       </div>
       <div id="notiftable-grouped" style="margin-top:20px"></div>
+    </div>
+
+    <div id="tab-remerciement" class="org-panel hidden">
+      <h3>Message de remerciement</h3>
+      <p style="color:rgba(255,255,255,.6);font-size:13px;margin-bottom:18px;line-height:1.6">
+        Envoyé aux invités <strong style="color:var(--mint)">confirmés</strong> uniquement. Les numéros ivoiriens (+225) valides
+        sont regroupés en lots pour l'envoi SMS groupé (l'app SMS limite le nombre de destinataires par message,
+        d'où le découpage en plusieurs lots). Les invités avec un numéro non ivoirien sont notifiés <strong>individuellement sur WhatsApp</strong>.
+      </p>
+      <div class="notif-msg-block">
+        <label class="manual-code-label">Message envoyé (modifiable)</label>
+        <textarea id="remerciement-message" rows="14">À notre chère famille, à nos amis et à tous ceux qui ont partagé notre joie,
+
+Nous souhaitons vous exprimer notre profonde gratitude. Il existe des moments que l'on n'oublie jamais. Notre mariage en fera toujours partie, et vous y êtes pour beaucoup.
+
+Votre présence, vos sourires, vos prières, votre générosité et toutes vos attentions ont rendu notre mariage encore plus beau que nous ne l'avions imaginé.
+
+Merci d'avoir célébré avec nous ce nouveau chapitre de notre vie. Merci d'avoir contribué, chacun à votre manière, à faire de ces instants de bonheur des souvenirs que nous porterons toute notre vie dans nos cœurs.
+
+Nous tenons également à présenter nos sincères excuses à toutes les personnes qui ont pu être confrontées à des désagréments. Malgré toute notre volonté de faire de ces célébrations un moment de joie pour chacun, nous espérons sincèrement que ces imprévus n'auront pas terni les beaux souvenirs que vous garderez de notre mariage.
+
+Nous prions que le Seigneur vous bénisse abondamment, veille sur vous et vos familles, et vous rende au centuple tout l'amour et toute la bienveillance que vous nous avez témoignés.
+
+Du fond du cœur, merci. ❤️
+
+Avec toute notre affection,
+Maeva &amp; Félix</textarea>
+      </div>
+      <div id="remerciement-body" style="margin-top:20px"></div>
     </div>
 
     <div id="tab-parametres" class="org-panel hidden">
@@ -3531,7 +3561,7 @@ const SCAN_COOLDOWN_MS = 60000; // 60 secondes entre deux scans réussis
 function showTab(tab, btn){
   document.querySelectorAll('.org-tab').forEach(t=>t.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['invites','tables','scanner','mouvements','notifications','notiftable','parametres'].forEach(t=>hide('tab-'+t));
+  ['invites','tables','scanner','mouvements','notifications','notiftable','remerciement','parametres'].forEach(t=>hide('tab-'+t));
   show('tab-'+tab);
   if(tab==='scanner') setScanMode('camera');
   else stopScanner();
@@ -3539,6 +3569,7 @@ function showTab(tab, btn){
   if(tab==='tables') renderTablesView();
   if(tab==='notifications') renderNotifList();
   if(tab==='notiftable') renderNotifTableView();
+  if(tab==='remerciement') renderRemerciementView();
   if(tab==='parametres'){
     // Reset form fields when entering settings
     ['cp-old','cp-new','cp-confirm'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
@@ -3563,6 +3594,7 @@ async function loadDashboard(){
   $('st-a-relancer').textContent = invites.filter(isToRelance).length;
   const tableSet = new Set(invites.filter(i=>i.statut==='confirme' && (i.table_nom||'').trim()).map(i=>i.table_nom.trim().toLowerCase()));
   $('st-notiftable-tables').textContent = tableSet.size;
+  $('st-remerciement-count').textContent = invites.filter(i=>i.statut==='confirme').length;
   filterGuests();
 }
 
@@ -3998,6 +4030,77 @@ function sendIndividualTableWhatsApp(btn){
   const digits = phone.replace(/[^0-9]/g,'');
   window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`,'_blank');
   if(id) markNotified(id, 'whatsapp');
+}
+
+// Découpe les numéros ivoiriens en lots pour l'envoi SMS groupé (une URL
+// sms: trop longue avec des centaines de destinataires est peu fiable selon
+// les téléphones/OS ; on limite donc chaque lot à 40 destinataires).
+const REMERCIEMENT_BATCH_SIZE = 40;
+let remerciementBatches = [];
+
+function buildRemerciementMessage(){
+  return $('remerciement-message')?.value || '';
+}
+
+function renderRemerciementView(){
+  const wrap = $('remerciement-body');
+  if(!wrap) return;
+
+  const confirmed = allInvites.filter(i => i.statut === 'confirme');
+  const ivoiriens = confirmed.filter(gu => isIvorian(gu.telephone));
+  const autres = confirmed.filter(gu => gu.telephone && !isIvorian(gu.telephone));
+
+  remerciementBatches = [];
+  for(let i=0; i<ivoiriens.length; i+=REMERCIEMENT_BATCH_SIZE){
+    remerciementBatches.push(ivoiriens.slice(i, i+REMERCIEMENT_BATCH_SIZE));
+  }
+
+  let html = '';
+
+  html += `<div class="table-group-card">
+    <div class="table-group-title">SMS groupé — invités avec un numéro ivoirien <span class="table-group-count">${ivoiriens.length}</span></div>`;
+  if(remerciementBatches.length === 0){
+    html += `<p style="color:rgba(255,255,255,.55);font-style:italic;margin-top:10px">Aucun numéro ivoirien parmi les invités confirmés.</p>`;
+  } else {
+    html += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
+      ${remerciementBatches.map((batch, idx) => `<button class="action-btn" onclick="sendRemerciementSmsBatch(${idx})">✉️ Lot ${idx+1} — ${batch.length} destinataire(s)</button>`).join('')}
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="table-group-card" style="margin-top:16px">
+    <div class="table-group-title">WhatsApp individuel — invités sans numéro ivoirien <span class="table-group-count">${autres.length}</span></div>`;
+  if(autres.length === 0){
+    html += `<p style="color:rgba(255,255,255,.55);font-style:italic;margin-top:10px">Aucun invité confirmé avec un numéro non ivoirien.</p>`;
+  } else {
+    html += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
+      ${autres.map(gu => `<button class="action-btn" data-tel="${escapeHtml(gu.telephone||'')}" onclick="sendRemerciementWhatsApp(this)">📱 ${escapeHtml(gu.nom||'')}</button>`).join('')}
+    </div>`;
+  }
+  html += `</div>`;
+
+  const sansNumero = confirmed.filter(gu => !gu.telephone);
+  if(sansNumero.length > 0){
+    html += `<p style="color:rgba(255,255,255,.5);font-size:12px;margin-top:14px">${sansNumero.length} invité(s) confirmé(s) sans numéro de téléphone ne peuvent pas être notifiés.</p>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
+function sendRemerciementSmsBatch(idx){
+  const batch = remerciementBatches[idx];
+  if(!batch || batch.length===0){ toast('Lot introuvable'); return; }
+  const msg = buildRemerciementMessage();
+  const numbers = batch.map(i => (i.telephone||'').replace(/[^0-9+]/g,''));
+  window.location.href = buildSmsGroupUrl(numbers, msg);
+}
+
+function sendRemerciementWhatsApp(btn){
+  const phone = btn.dataset.tel || '';
+  if(!phone){ toast('Aucun numéro pour cet invité'); return; }
+  const msg = buildRemerciementMessage();
+  const digits = phone.replace(/[^0-9]/g,'');
+  window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 
 async function addGuest(){
